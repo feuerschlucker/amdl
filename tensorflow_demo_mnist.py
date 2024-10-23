@@ -41,8 +41,10 @@ predictions = model(x_train[:1]).numpy()
 
 # Configure the model training procedure
 model.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.01),
-              loss=tf.keras.losses.CategoricalCrossentropy(from_logits=False),
+              loss=tf.losses.MeanSquaredError(
+                  reduction="sum_over_batch_size", name="mean_squared_error", dtype=None),
               metrics=['accuracy'])
+
 
 # Perform model training
 model.fit(x_train, y_train, epochs=20, batch_size=64)
