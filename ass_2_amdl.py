@@ -9,6 +9,9 @@ from tensorflow.keras.optimizers import SGD, RMSprop, Adam
 from tensorflow.keras import regularizers
 import json
 
+## public Repository
+## https://github.com/feuerschlucker/amdl.git
+
 
 def load_data():
     dict = pickle.load(open('california-housing-dataset.pkl', 'rb'))
@@ -313,7 +316,7 @@ def main():
     model = model_compile_adam(model)
 
     # MODEL FIT
-    use_saved_weights = True
+    use_saved_weights = False
     model, history = model_fit(
         model, data_train, target_train, data_val, target_val, use_saved_weights)
 
