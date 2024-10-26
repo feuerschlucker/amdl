@@ -14,6 +14,7 @@ def load_data():
     dict = pickle.load(open('california-housing-dataset.pkl', 'rb'))
     x_train, y_train = dict['x_train'], dict['y_train']
     x_test, y_test = dict['x_test'], dict['y_test']
+    print(len(x_train))
     return x_train, y_train, x_test, y_test
 
 
@@ -54,9 +55,7 @@ def histos(data, target, feature_names, figname):
     '''
     create a figure with nine histograms, containing features and targets
     '''
-
     no_features = ((data[0].shape[0]))
-    print(len(feature_names))
     fig, axs = plt.subplots(3, 3, figsize=(10, 10))
     axs = axs.ravel()
     plt.suptitle(figname, size=20)
@@ -88,13 +87,12 @@ def xplot(data, target):
     plt.show()
 
 
-def validation_set(data, target):
+def validation_set(data, target, t_size):
     '''
-    Using 20 % of the training data, to create a validation set.  
+    Using t_size *100 % of the training data, to create a validation set.  
     '''
     data_train, data_val, target_train, target_val = train_test_split(
-        data, target, test_size=0.2, random_state=1)
-
+        data, target, test_size=t_size, random_state=1)
     return data_train, data_val, target_train, target_val
 
 
@@ -109,6 +107,7 @@ def plot_training_history(history):
     plt.figure(figsize=(10, 6))
     plt.plot(epochs, loss, 'b-', label='Training Loss')
     plt.plot(epochs, val_loss, 'r-', label='Validation Loss')
+    plt.ylim(0, 1.5)
     plt.title('Training and Validation Loss per Epoch')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
@@ -116,9 +115,6 @@ def plot_training_history(history):
     plt.grid(True)
     plt.savefig("losses")
     plt.show()
-
-
-
 
 
 def plot_prediction_actual(y_test, y_test_predict):
@@ -129,11 +125,8 @@ def plot_prediction_actual(y_test, y_test_predict):
     slope, intercept, r_value, p_value, std_err = stats.linregress(
         y_test, y_test_predict)
     fig, ax = plt.subplots(figsize=(10, 8))
-    # ax.scatter(y_test, y_test_predict, label="Data Points")
-    
-    ax.hist2d(y_test, y_test_predict, bins=40, cmap='Blues')  # Adjust gridsize and colormap as needed
-    #ax.colorbar(label='Density')
-    
+    # ax.scatter(y_test, y_test_predict, label="Data Points")   # scatter plot only
+    ax.hist2d(y_test, y_test_predict, bins=40, cmap='Blues')
     ax.plot(y_test, intercept + slope * y_test, 'r',
             label=f'Regression Line: y = {slope:.2f}x + {intercept:.2f}', lw=2)
     ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()],
@@ -141,10 +134,12 @@ def plot_prediction_actual(y_test, y_test_predict):
     textstr = f"Correlation: {correlation:.2f}"
     ax.text(0.05, 0.75, textstr, transform=ax.transAxes, fontsize=12,
             verticalalignment='top', bbox=dict(facecolor='white', alpha=0.5))
+    ax.set_xlim(0, 5.5)
+    ax.set_ylim(0, 5.5)
     plt.title("Prediction vs Actual")
     plt.xlabel("Actual Values")
     plt.ylabel("Predicted Values")
-    plt.legend()
+    plt.legend(loc='upper left')
     plt.show()
     fig.savefig("prediction_vs_actual.png")
 
@@ -169,12 +164,13 @@ def build_model_intermediate():
 def build_model_advanced():
     model = tf.keras.models.Sequential()
     model.add(tf.keras.Input(shape=(8,)))
-    model.add(tf.keras.layers.Dense(256,  activation='relu'))
+    model.add(tf.keras.layers.Dense(32,  activation='relu'))
+    model.add(tf.keras.layers.Dense(128, activation='relu'))
     model.add(tf.keras.layers.Dense(512, activation='relu'))
+    model.add(tf.keras.layers.Dense(1024, activation='relu'))
     model.add(tf.keras.layers.Dense(256, activation='relu'))
-    model.add(tf.keras.layers.Dense(256,  activation='relu'))
-    model.add(tf.keras.layers.Dense(512, activation='relu'))
-    model.add(tf.keras.layers.Dense(256, activation='relu'))
+    model.add(tf.keras.layers.Dense(128,  activation='relu'))
+    model.add(tf.keras.layers.Dense(64, activation='relu'))
     model.add(tf.keras.layers.Dense(1))
     return model
 
@@ -221,8 +217,18 @@ def build_model_dropout():
     return model
 
 
+def build_model_categorical():
+    model = tf.keras.models.Sequential()
+    model.add(tf.keras.Input(shape=(8,)))
+    model.add(tf.keras.layers.Dense(32,  activation='relu'))
+    model.add(tf.keras.layers.Dense(512, activation='relu'))
+    model.add(tf.keras.layers.Dense(128, activation='relu'))
+    model.add(tf.keras.layers.Dense(2, activation='softmax'))
+    return model
+
+
 def model_compile_adam(model):
-    learning_rate=0.01
+    learning_rate = 0.001
     optimizer = Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss='mse')
     model.summary()
@@ -249,12 +255,14 @@ def model_compile_rmsprop(model):
     return model
 
 
-def model_fit(model, data_train, target_train, data_val, target_val):
+def model_fit(model, data_train, target_train, data_val, target_val, use_saved_weights):
+    if use_saved_weights == True:
+        model.load_weights("best_weights.weights.h5")
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss', patience=10)
     history = model.fit(data_train, target_train, epochs=500, batch_size=64,
                         validation_data=(data_val, target_val), callbacks=[early_stopping])
-    model.save('model.keras')
+    model.save_weights("best_weights.weights.h5")
     with open('model_history.json', 'w') as file:
         json.dump(history.history, file)
 
@@ -274,7 +282,7 @@ def main():
     # figname = "Training Data - Raw"
     # histos(x_train, y_train, f_names, figname)
     # xplot(x_train, y_train)
-    
+
     # figname = "Test Data - Raw"
     # histos(x_test, y_test, f_names, figname)
     # xplot(x_test, y_test)
@@ -285,15 +293,17 @@ def main():
 
     # figname = "Training Data - Normalized"
     # histos(x_train, y_train, f_names, figname)
-    
+
     # VALIDATION SET CREATION
+    t_size = 0.2  # for all training
+    # t_size = 0.1  # for final
     data_train, data_val, target_train, target_val = validation_set(
-        x_train, y_train)
+        x_train, y_train, t_size)
 
     # SELECT MODEL ARCHITECTURE
     # model = build_model_regression()
-    model = build_model_intermediate()
-    # model = build_model_advanced()
+    # model = build_model_intermediate()
+    model = build_model_advanced()
     # model = build_model_L2reg()
     # model = build_model_dropout()
 
@@ -303,14 +313,36 @@ def main():
     model = model_compile_adam(model)
 
     # MODEL FIT
+    use_saved_weights = True
     model, history = model_fit(
-        model, data_train, target_train, data_val, target_val)
+        model, data_train, target_train, data_val, target_val, use_saved_weights)
 
     plot_training_history(history)
 
     # MODEL PREDICT
     y_test_predict = model.predict(x_test)
     plot_prediction_actual(y_test, y_test_predict)
+
+    ## Create Categorical Model
+
+    # target_train[target_train < 2] = 0
+    # target_train[target_train >= 2] = 1
+    # target_val[target_val < 2] = 0
+    # target_val[target_val >= 2] = 1
+    # y_test[y_test < 2] = 0
+    # y_test[y_test >= 2] = 1
+
+    # model = build_model_categorical()
+    # model.compile(optimizer='adam',
+    #               loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    # early_stopping = tf.keras.callbacks.EarlyStopping(
+    #     monitor='val_loss', patience=10)
+    # model.fit(data_train, target_train,  epochs=500, batch_size=64, validation_data=(
+    #     data_val, target_val), callbacks=[early_stopping])
+    # y_test_predict = np.argmax(model.predict(x_test), axis=1)
+    # score = np.mean(y_test_predict == y_test)
+    # print(f"Accuracy: {score:.2f}")
+
 
 
 if __name__ == '__main__':
